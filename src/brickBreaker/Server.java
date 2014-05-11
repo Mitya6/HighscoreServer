@@ -1,10 +1,21 @@
 package brickBreaker;
 
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.ArrayList;
+
+import javax.xml.bind.JAXBContext;
+import javax.xml.bind.JAXBElement;
+import javax.xml.bind.JAXBException;
+import javax.xml.bind.Marshaller;
+import javax.xml.bind.Unmarshaller;
+import javax.xml.transform.Source;
+import javax.xml.transform.stream.StreamSource;
 
 public class Server extends UnicastRemoteObject implements HighscoreManager {
 
@@ -15,10 +26,28 @@ public class Server extends UnicastRemoteObject implements HighscoreManager {
 	@Override
 	public ArrayList<Score> getScores() throws RemoteException {
 		
+		JAXBElement<HighscoreListType> scoreList = null;
+		
+		try {
+			JAXBContext ctx = JAXBContext.newInstance("brickBreaker");
+			
+			Unmarshaller umars = ctx.createUnmarshaller();
+			
+			Source source = new StreamSource(new FileInputStream(".\\scoreData\\highscores.xml"));
+			scoreList = umars.unmarshal(source, HighscoreListType.class);
+			
+		} catch (JAXBException e) {
+			e.printStackTrace();
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		}
+		
+		if (scoreList == null) return null;
+		
 		ArrayList<Score> scores = new ArrayList<Score>();
 		
-		for (int i = 0; i < 10; i++) {
-			scores.add(new Score("Matyas", i, i*1000L));
+		for (HighscoreType ht : scoreList.getValue().getHighscore()) {
+			scores.add(new Score(ht.getPlayer(), ht.getBricksRemaining(), ht.getTimeMillis()));
 		}
 		
 		return scores;
@@ -26,8 +55,45 @@ public class Server extends UnicastRemoteObject implements HighscoreManager {
 
 	@Override
 	public void uploadScore(Score score) throws RemoteException {
-		// TODO Auto-generated method stub
 		
+		JAXBElement<HighscoreListType> scoreList = null;
+		
+		try {
+			JAXBContext ctx = JAXBContext.newInstance("brickBreaker");
+			
+			Unmarshaller umars = ctx.createUnmarshaller();
+			
+			Source source = new StreamSource(new FileInputStream(".\\scoreData\\highscores.xml"));
+			scoreList = umars.unmarshal(source, HighscoreListType.class);
+			
+		} catch (JAXBException e) {
+			e.printStackTrace();
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		}
+		
+		if (scoreList == null) return;
+		
+		HighscoreType ht = new HighscoreType();
+		ht.setPlayer(score.player);
+		ht.setBricksRemaining(score.bricksRemaining);
+		ht.setTimeMillis((int) score.timeMillis);
+		
+		HighscoreListType highscorelist = scoreList.getValue();
+		highscorelist.getHighscore().add(ht);
+		
+		try {
+			JAXBContext ctx = JAXBContext.newInstance("brickBreaker");
+			
+			Marshaller mars = ctx.createMarshaller();
+			
+			mars.marshal(highscorelist, new FileOutputStream(".\\scoreData\\highscores.xml"));
+			
+		} catch (JAXBException e) {
+			e.printStackTrace();
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		}
 	}
 
 	public static void main(String args[]) {
